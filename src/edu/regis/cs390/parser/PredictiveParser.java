@@ -92,6 +92,8 @@ public class PredictiveParser {
             case ID:
             case READ:
             case WRITE:
+            case INTEGER:
+            case BOOLEAN:
                 stmt(node);
                 stmtList(node);
                 break;
@@ -107,7 +109,7 @@ public class PredictiveParser {
     }
     
     /**
-     * Parses the production: stmt -> id = expr | read id | write expr
+     * Parses the production: stmt -> id = expr idTail | read id | write expr
      * 
      * @throws ParseError the expected token wasn't found
      * @throws IOException an unexpected non-recoverable error occurred
@@ -116,31 +118,88 @@ public class PredictiveParser {
         TreeNode node = new TreeNode(TreeNode.PRODUCTION.STMT, parent);
         
         switch (currentToken.type) {
+            case BOOLEAN:
+                match(TokenType.BOOLEAN, node);
+                declaration(node);
+                break;
+                
             case ID:
                 match(TokenType.ID, node);
                 
-                match(TokenType.ASSIGN, node);
+                idTail(node);
+                break;
                 
-                expr(node);
+            case INTEGER:
+                match(TokenType.INTEGER, node);
+                declaration(node);
                 break;
                 
             case READ:
                 match(TokenType.READ, node);    
                 match(TokenType.ID, node);
                 break;
+                
             case WRITE:
                 match(TokenType.WRITE,node);
                 
                 expr(node);
                 break;
-                    
+     
                 
             default:
                 throw new ParseError("stmt() unmatched token: " +
                                       currentToken.type);
         }
     }
-    
+    /**
+     * Parses the production: idTail -> expr id
+     * 
+     * @throws ParseError the expected token wasn't found
+     * @throws IOException an unexpected non-recoverable error occurred
+     */
+    private void idTail(TreeNode parent) throws ParseError, IOException {
+        TreeNode node = new TreeNode(TreeNode.PRODUCTION.EXPR, parent);
+        
+        switch (currentToken.type) {
+            case ASSIGN:
+                match(TokenType.ASSIGN, node);
+                expr(node);       
+                break;
+            case LPAREN:
+                match(TokenType.LPAREN, node);
+                match(TokenType.ID, node);
+                match(TokenType.RPAREN, node);
+                break;
+            default:
+               throw new ParseError("expr() unmatched token: " +
+                                      currentToken.type); 
+        }
+    }
+    /**
+     * Parses the production: idTail -> expr id
+     * 
+     * @throws ParseError the expected token wasn't found
+     * @throws IOException an unexpected non-recoverable error occurred
+     */
+    private void declaration(TreeNode parent) throws ParseError, IOException {
+        TreeNode node = new TreeNode(TreeNode.PRODUCTION.EXPR, parent);
+        
+        switch (currentToken.type) {
+            case INTEGER:
+                match(TokenType.INTEGER, node);
+                expr(node);       
+                break;
+                
+            case BOOLEAN:
+                match(TokenType.BOOLEAN, node);
+                expr(node);
+                break;
+                
+            default:
+               throw new ParseError("expr() unmatched token: " +
+                                      currentToken.type); 
+        }
+    }
     /**
      * Parses the production: expr -> term termTail
      * 
@@ -156,10 +215,12 @@ public class PredictiveParser {
             case TRUE:
             case FALSE:
             case LPAREN:
+            case NOT:
                 term(node);
                         
                 termTail(node);
                 break;
+
             default:
                throw new ParseError("expr() unmatched token: " +
                                       currentToken.type); 
@@ -181,6 +242,7 @@ public class PredictiveParser {
             case TRUE:
             case FALSE:
             case NUMBER:
+            case NOT:
                 factor(node);
                 factorTail(node);
                 break;
@@ -247,6 +309,10 @@ public class PredictiveParser {
             case FALSE:
                 match(TokenType.FALSE, node);
                 break;
+            case NOT:
+                match(TokenType.NOT, node);
+                expr(node);
+                break;
             default:
                 throw new ParseError("factor() unmatched token: " +
                                       currentToken.type);
@@ -275,6 +341,7 @@ public class PredictiveParser {
             case ID:
             case READ:
             case WRITE:
+            case NOT:
             case EOF:
                 node.add(new TreeNode(TreeNode.PRODUCTION.EMPTY, null));
                 break;
@@ -352,8 +419,15 @@ public class PredictiveParser {
                 case ASSIGN:
                     node = new TreeNode(TreeNode.PRODUCTION.PUNCTUATION , parent, ":=");
                     break;
+                case NOT:
+                    node = new TreeNode(TreeNode.PRODUCTION.PUNCTUATION , parent, "!");
+                    break;
                 case TRUE:
                     node = new TreeNode(TreeNode.PRODUCTION.TRUE , parent, currentToken.lexeme);
+                    break;
+                case FALSE:
+                    node = new TreeNode(TreeNode.PRODUCTION.FALSE , parent, currentToken.lexeme);
+                    break;
                 case EOF:
                     node = new TreeNode(TreeNode.PRODUCTION.PUNCTUATION, parent, "$$");
                     break;
@@ -378,3 +452,13 @@ public class PredictiveParser {
         }
     }
 }
+
+/*
+TESTED GOOD---``````````````````add true and false alternate right-side productions to the factor production
+NEED TO TEST--------add “int id;” and “bool id;” alternatives to the stmt production
+add a semi-colon that ends each alternative stmt production
+NEED TO TEST--------add the declarations production
+NEED TO TEST--------``````````````````add a “! expr” alternative production to the factor production
+NEED TO TEST--------add a new idTail production that handles assignment or a function call
+NEED TO TEST--------modify the stmt production to use the new idTail production
+*/
